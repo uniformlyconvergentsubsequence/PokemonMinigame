@@ -1,13 +1,14 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-type StatKey = 'hp' | 'attack' | 'defense' | 'special-attack' | 'special-defense' | 'speed'
+type BaseStatKey = 'hp' | 'attack' | 'defense' | 'special-attack' | 'special-defense' | 'speed'
+type StatKey = BaseStatKey | 'bst'
 
 type Pokemon = {
   id: number
   name: string
   artwork: string
-  stats: Record<StatKey, number>
+  stats: Record<BaseStatKey, number>
   moves: string[]
   flavorText?: string
 }
@@ -49,6 +50,7 @@ const STAT_LABELS: Record<StatKey, string> = {
   'special-attack': 'Sp. Attack',
   'special-defense': 'Sp. Defense',
   speed: 'Speed',
+  bst: 'Total BST',
 }
 
 const STAT_KEYS = Object.keys(STAT_LABELS) as StatKey[]
@@ -148,7 +150,6 @@ function App() {
   const [dexGuess, setDexGuess] = useState('')
   const [dexAnswer, setDexAnswer] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [lastKeptId, setLastKeptId] = useState<number | null>(null)
   const [movePool, setMovePool] = useState<MovePool>('popular')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const revealFrame = useRef<number | null>(null)
@@ -211,8 +212,16 @@ function App() {
 
   const totalPokemon = pokemon.length
 
-  const currentLeftValue = left ? left.stats[stat] : 0
-  const currentRightValue = right ? right.stats[stat] : 0
+  const getStatValue = useCallback((mon: Pokemon | null, key: StatKey) => {
+    if (!mon) return 0
+    if (key === 'bst') {
+      return Object.values(mon.stats).reduce((sum, value) => sum + value, 0)
+    }
+    return mon.stats[key]
+  }, [])
+
+  const currentLeftValue = getStatValue(left, stat)
+  const currentRightValue = getStatValue(right, stat)
 
   const activeMovePool = useMemo(() => {
     if (!popularMoves || movePool === 'all') return null
@@ -321,19 +330,29 @@ function App() {
   }, [pokemon])
 
   const startStatRound = useCallback(
-    (keep?: Pokemon | null) => {
+    (keep?: Pokemon | null, keepSide?: GuessSide | null) => {
       if (pokemon.length < 2) return
-      const nextLeft = keep ?? pickRandomPokemon()
-      if (!nextLeft) return
-      let nextRight = pickRandomPokemon(nextLeft.id)
-      if (!nextRight) return
+      let nextLeft = keepSide === 'right' ? pickRandomPokemon(keep?.id) : keep ?? pickRandomPokemon()
+      let nextRight = keepSide === 'left' ? pickRandomPokemon(keep?.id) : keepSide ? keep : pickRandomPokemon()
+
+      if (!nextLeft || !nextRight) return
       let nextStat = STAT_KEYS[Math.floor(Math.random() * STAT_KEYS.length)]
       let guard = 0
-      while (guard < 40 && nextRight && nextLeft.stats[nextStat] === nextRight.stats[nextStat]) {
-        nextRight = pickRandomPokemon(nextLeft.id)
+
+      while (guard < 60 && nextLeft && nextRight && getStatValue(nextLeft, nextStat) === getStatValue(nextRight, nextStat)) {
         nextStat = STAT_KEYS[Math.floor(Math.random() * STAT_KEYS.length)]
+        if (keepSide === 'left') {
+          nextRight = pickRandomPokemon(keep?.id)
+        } else if (keepSide === 'right') {
+          nextLeft = pickRandomPokemon(keep?.id)
+        } else {
+          nextLeft = pickRandomPokemon()
+          nextRight = pickRandomPokemon(nextLeft?.id)
+        }
         guard += 1
       }
+
+      if (!nextLeft || !nextRight) return
 
       setLeft(nextLeft)
       setRight(nextRight)
@@ -341,7 +360,7 @@ function App() {
       setGuess(null)
       setRevealValues({ left: 0, right: 0 })
     },
-    [pickRandomPokemon, pokemon.length],
+    [pickRandomPokemon, pokemon.length, getStatValue],
   )
 
   const startMoveCompareRound = useCallback(() => {
@@ -450,8 +469,8 @@ function App() {
     if (status !== 'revealing' || !left || !right || mode !== 'stat') return
     const duration = 1500
     const start = performance.now()
-    const leftValue = left.stats[stat]
-    const rightValue = right.stats[stat]
+    const leftValue = getStatValue(left, stat)
+    const rightValue = getStatValue(right, stat)
 
     const step = (time: number) => {
       const progress = Math.min((time - start) / duration, 1)
@@ -483,10 +502,7 @@ function App() {
         if (left && right && guess && isStatCorrect) {
           setScore((prev) => prev + 1)
           const winner = guess === 'left' ? left : right
-          const loser = guess === 'left' ? right : left
-          const carry = winner.id === lastKeptId ? loser : winner
-          setLastKeptId(carry.id)
-          startStatRound(carry)
+          startStatRound(winner, guess)
           setStatus('ready')
           return
         }
@@ -539,7 +555,6 @@ function App() {
     score,
     compareScore,
     trueFalseScore,
-    lastKeptId,
     startStatRound,
     startMoveCompareRound,
     startTrueFalseRound,
@@ -619,7 +634,6 @@ function App() {
 
     if (mode === 'stat') {
       setScore(0)
-      setLastKeptId(null)
       startStatRound(null)
     }
     if (mode === 'move-compare') {
