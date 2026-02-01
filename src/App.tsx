@@ -369,18 +369,22 @@ function App() {
     while (attempts < 80) {
       const leftPick = pickRandomPokemon()
       if (!leftPick) return
-      const movePick = pickMoveFrom(leftPick, activeMoveSet)
+      const rightPick = pickRandomPokemon(leftPick.id)
+      if (!rightPick) {
+        attempts += 1
+        continue
+      }
+
+      const moveSide: GuessSide = Math.random() > 0.5 ? 'left' : 'right'
+      const source = moveSide === 'left' ? leftPick : rightPick
+      const other = moveSide === 'left' ? rightPick : leftPick
+      const movePick = pickMoveFrom(source, activeMoveSet)
       if (!movePick) {
         attempts += 1
         continue
       }
-      let rightPick = pickRandomPokemon(leftPick.id)
-      let guard = 0
-      while (rightPick && guard < 40 && rightPick.moves.includes(movePick)) {
-        rightPick = pickRandomPokemon(leftPick.id)
-        guard += 1
-      }
-      if (!rightPick) {
+
+      if (other.moves.includes(movePick)) {
         attempts += 1
         continue
       }
