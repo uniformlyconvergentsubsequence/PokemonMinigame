@@ -136,7 +136,7 @@ function App() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch('/data/pokemon.json')
+        const response = await fetch(`${import.meta.env.BASE_URL}data/pokemon.json`)
         if (!response.ok) {
           throw new Error('Missing local Pokemon dataset. Run the fetch script to generate it.')
         }
@@ -154,7 +154,7 @@ function App() {
   useEffect(() => {
     const loadPopularMoves = async () => {
       try {
-        const response = await fetch('/data/popular-moves.json')
+        const response = await fetch(`${import.meta.env.BASE_URL}data/popular-moves.json`)
         if (!response.ok) return
         const data = (await response.json()) as PopularMoves
         setPopularMoves(data)
