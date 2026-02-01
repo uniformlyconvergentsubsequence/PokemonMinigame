@@ -102,6 +102,33 @@ function useHighScore(key: string) {
   return [highScore, setHighScore] as const
 }
 
+async function fetchWithFallback<T>(path: string): Promise<T | null> {
+  const base = import.meta.env.BASE_URL || '/'
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`
+  const runtimeBase = window.location.pathname.endsWith('/')
+    ? window.location.pathname
+    : window.location.pathname.replace(/\/[^/]*$/, '/')
+
+  const candidates = [
+    `${normalizedBase}${path}`,
+    `${runtimeBase}${path}`,
+    `/${path}`,
+    path,
+  ]
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url)
+      if (!response.ok) continue
+      return (await response.json()) as T
+    } catch {
+      // continue
+    }
+  }
+
+  return null
+}
+
 function App() {
   const [mode, setMode] = useState<Mode>('menu')
   const [pokemon, setPokemon] = useState<Pokemon[]>([])
@@ -136,11 +163,10 @@ function App() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}data/pokemon.json`)
-        if (!response.ok) {
+        const data = (await fetchWithFallback<Dataset>('data/pokemon.json')) ?? null
+        if (!data) {
           throw new Error('Missing local Pokemon dataset. Run the fetch script to generate it.')
         }
-        const data = (await response.json()) as Dataset
         setPokemon(data.pokemon)
         setStatus('ready')
       } catch (err) {
@@ -154,10 +180,8 @@ function App() {
   useEffect(() => {
     const loadPopularMoves = async () => {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}data/popular-moves.json`)
-        if (!response.ok) return
-        const data = (await response.json()) as PopularMoves
-        setPopularMoves(data)
+        const data = await fetchWithFallback<PopularMoves>('data/popular-moves.json')
+        if (data) setPopularMoves(data)
       } catch {
         setPopularMoves(null)
       }
