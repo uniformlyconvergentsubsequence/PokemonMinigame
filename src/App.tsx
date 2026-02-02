@@ -506,7 +506,8 @@ function App() {
         if (left && right && guess && isStatCorrect) {
           setScore((prev) => prev + 1)
           const winner = guess === 'left' ? left : right
-          startStatRound(winner, guess)
+          const side = guess === 'left' || guess === 'right' ? guess : null
+          startStatRound(winner, side)
           setStatus('ready')
           return
         }
