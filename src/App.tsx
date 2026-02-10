@@ -82,6 +82,10 @@ function normalizeAnswer(value: string) {
     .trim()
 }
 
+function isGuessSide(value: GuessSide | TrueFalse | null): value is GuessSide {
+  return value === 'left' || value === 'right'
+}
+
 function useHighScore(key: string) {
   const [highScore, setHighScore] = useState(0)
 
@@ -506,7 +510,7 @@ function App() {
         if (left && right && guess && isStatCorrect) {
           setScore((prev) => prev + 1)
           const winner = guess === 'left' ? left : right
-          const side = guess === 'left' || guess === 'right' ? guess : null
+          const side = isGuessSide(guess) ? guess : null
           startStatRound(winner, side)
           setStatus('ready')
           return
